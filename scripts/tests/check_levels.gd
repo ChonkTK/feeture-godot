@@ -1,8 +1,9 @@
 extends SceneTree
-## Smoke test (M1b): build each level via LevelBuilder in ISOLATION (one level
-## in the world at a time, so raycasts can't hit other levels' colliders),
-## verify structure (ground + sun + world env + props + spawns) and that
-## building door gaps are walkable (raycast from inside passes through the gap).
+## Smoke test (M1b/M4): build each level via LevelBuilder in ISOLATION (one
+## level in the world at a time, so raycasts can't hit other levels' colliders),
+## verify structure (ground + sun + world env + props + spawns), that building
+## door gaps are walkable (raycast from inside passes through the gap), and that
+## the world is dense: >= 25 props and >= 10 NPC spawns per level.
 
 var _checked := false
 var _results: Array[String] = []
@@ -33,11 +34,11 @@ func _process(_delta: float) -> bool:
 		if level.get_node_or_null("WorldEnvironment") == null:
 			push_error(def.name + ": missing WorldEnvironment")
 			_failures += 1
-		if prop_count <= 0:
-			push_error(def.name + ": no props built")
+		if prop_count < 25:
+			push_error(def.name + ": only %d props (need >= 25)" % prop_count)
 			_failures += 1
-		if def.npc_spawns.size() < 8:
-			push_error(def.name + ": fewer than 8 npc_spawns")
+		if def.npc_spawns.size() < 10:
+			push_error(def.name + ": only %d npc_spawns (need >= 10)" % def.npc_spawns.size())
 			_failures += 1
 		if not _check_door_gap(level, def):
 			_failures += 1
@@ -91,9 +92,15 @@ func _check_door_gap(level: Node3D, def: LevelDefinition) -> bool:
 	return true
 
 
+## Counts prop roots: direct StaticBody3D children of the level root (minus
+## Ground), plus the StaticBody3D root of each AmbientAnimator-wrapped prop.
 func _count_prop_roots(level: Node3D) -> int:
 	var count := 0
 	for child in level.get_children():
 		if child is StaticBody3D and child.name != "Ground":
 			count += 1
+		elif child is AmbientAnimator:
+			for sub in child.get_children():
+				if sub is StaticBody3D:
+					count += 1
 	return count

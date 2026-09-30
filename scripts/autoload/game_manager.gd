@@ -225,8 +225,8 @@ func _smoke_test() -> void:
 	var reason := ""
 	if player == null:
 		reason = "player missing"
-	elif npcs.size() < 8 or npcs.size() > 10:
-		reason = "npc count %d out of range 8..10" % npcs.size()
+	elif npcs.size() < 10 or npcs.size() > 16:
+		reason = "npc count %d out of range 10..16" % npcs.size()
 	elif current_level == null or level_root == null:
 		reason = "level missing"
 	if reason.is_empty():

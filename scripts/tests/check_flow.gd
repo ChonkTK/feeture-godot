@@ -1,5 +1,5 @@
 extends SceneTree
-## M2c flow test: uses the GameManager autoload's own level (Beach, 9 NPCs,
+## M2c flow test: uses the GameManager autoload's own level (Beach, 14 NPCs,
 ## 2 targets) and asserts the full loop headless: (a) targets picked (count ==
 ## def.target_count, distinct names, flagged is_target); (b) photographing all
 ## targets -> state COMPLETE; (c) forcing creep 100 on a visible NPC -> state

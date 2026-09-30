@@ -3,6 +3,8 @@ extends RefCounted
 ## Procedurally builds a Node3D level from a LevelDefinition (M1b).
 ## All props get solid StaticBody3D colliders that block raycasts.
 ## M2a: bushes also get a HidingSpot trigger (player can hide inside).
+## M4: new decorative prop types + AmbientAnimator sine bob/sway for a few
+## props per level (beach balls, umbrellas, flags, fountain water).
 
 const WALL_THICKNESS := 0.2
 const DOOR_WIDTH := 1.2
@@ -99,7 +101,32 @@ static func _build_vignette(parent: Node3D, def: LevelDefinition) -> void:
 
 # --- Prop dispatch -----------------------------------------------------------
 
+## M4: props with bob/sway get wrapped in an AmbientAnimator (positioned at the
+## prop's spot; the prop itself is built at local origin inside the animator).
 static func _build_prop(parent: Node3D, prop: PropData) -> void:
+	if prop.bob > 0.0 or prop.sway > 0.0:
+		var anim := AmbientAnimator.new()
+		anim.name = "Animated"
+		anim.position = prop.position
+		anim.bob_amplitude = prop.bob
+		anim.sway_amplitude = prop.sway
+		anim.phase = fmod(absf(prop.position.x) + absf(prop.position.z), TAU)
+		parent.add_child(anim)
+		var local := PropData.new()
+		local.type = prop.type
+		local.scale = prop.scale
+		local.color = prop.color
+		local.door_side = prop.door_side
+		local.window_count = prop.window_count
+		local.bob = prop.bob
+		local.sway = prop.sway
+		local.position = Vector3.ZERO
+		_build_prop_inner(anim, local)
+	else:
+		_build_prop_inner(parent, prop)
+
+
+static func _build_prop_inner(parent: Node3D, prop: PropData) -> void:
 	match prop.type:
 		PropData.PropType.CUBE:
 			_add_box(parent, prop.position, prop.scale, prop.color, "Cube")
@@ -135,6 +162,40 @@ static func _build_prop(parent: Node3D, prop: PropData) -> void:
 			_build_bush(parent, prop)
 		PropData.PropType.UMBRELLA:
 			_build_umbrella(parent, prop)
+		PropData.PropType.LAMP_POST:
+			_build_lamp_post(parent, prop)
+		PropData.PropType.PLANTER:
+			_build_planter(parent, prop)
+		PropData.PropType.SIGN:
+			_build_sign(parent, prop)
+		PropData.PropType.ROCK:
+			_build_rock(parent, prop)
+		PropData.PropType.FLOWER:
+			_build_flower(parent, prop)
+		PropData.PropType.PATH_TILE:
+			_build_path_tile(parent, prop)
+		PropData.PropType.FOUNTAIN:
+			_build_fountain(parent, prop)
+		PropData.PropType.TRASH_CAN:
+			_build_trash_can(parent, prop)
+		PropData.PropType.TOWEL:
+			_build_towel(parent, prop)
+		PropData.PropType.COOLER:
+			_build_cooler(parent, prop)
+		PropData.PropType.BEACH_BALL:
+			_build_beach_ball(parent, prop)
+		PropData.PropType.PILLAR:
+			_build_pillar(parent, prop)
+		PropData.PropType.BOOTH:
+			_build_booth(parent, prop)
+		PropData.PropType.BAR:
+			_build_bar(parent, prop)
+		PropData.PropType.PICNIC_TABLE:
+			_build_picnic_table(parent, prop)
+		PropData.PropType.DUNE:
+			_build_dune(parent, prop)
+		PropData.PropType.FLAG:
+			_build_flag(parent, prop)
 
 
 # --- Compound props ----------------------------------------------------------
@@ -367,6 +428,171 @@ static func _build_umbrella(parent: Node3D, prop: PropData) -> void:
 	parent.add_child(root)
 	_add_cylinder(root, Vector3(0.0, h * 0.5, 0.0), Vector3(0.08, h, 0.08), Color(0.6, 0.6, 0.6), "Pole")
 	_add_sphere(root, Vector3(0.0, h, 0.0), Vector3(r * 2.0, r, r * 2.0), prop.color, "Canopy")
+
+
+# --- M4 decorative props -----------------------------------------------------
+
+static func _build_lamp_post(parent: Node3D, prop: PropData) -> void:
+	var h := prop.scale.y
+	var root := StaticBody3D.new()
+	root.name = "LampPost"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_cylinder(root, Vector3(0.0, h * 0.5, 0.0), Vector3(0.12, h, 0.12), Color(0.25, 0.25, 0.28), "Pole")
+	_add_sphere(root, Vector3(0.0, h, 0.0), Vector3(0.5, 0.35, 0.5), prop.color, "Lamp")
+
+
+static func _build_planter(parent: Node3D, prop: PropData) -> void:
+	var root := StaticBody3D.new()
+	root.name = "Planter"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_box(root, Vector3(0.0, 0.25, 0.0), Vector3(prop.scale.x, 0.5, prop.scale.z), prop.color, "Pot")
+	_add_sphere(root, Vector3(0.0, 0.65, 0.0), Vector3(prop.scale.x * 0.7, 0.5, prop.scale.z * 0.7), Color(0.2, 0.55, 0.2), "Plant")
+
+
+static func _build_sign(parent: Node3D, prop: PropData) -> void:
+	var h := prop.scale.y
+	var root := StaticBody3D.new()
+	root.name = "Sign"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_cylinder(root, Vector3(0.0, h * 0.4, 0.0), Vector3(0.1, h * 0.8, 0.1), Color(0.4, 0.35, 0.3), "Post")
+	_add_box(root, Vector3(0.0, h * 0.85, 0.0), Vector3(prop.scale.x, h * 0.3, 0.08), prop.color, "Board")
+
+
+static func _build_rock(parent: Node3D, prop: PropData) -> void:
+	var root := StaticBody3D.new()
+	root.name = "Rock"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_sphere(root, Vector3(0.0, prop.scale.y * 0.4, 0.0), Vector3(prop.scale.x, prop.scale.y * 0.8, prop.scale.z), prop.color, "Rock")
+
+
+static func _build_flower(parent: Node3D, prop: PropData) -> void:
+	var root := StaticBody3D.new()
+	root.name = "Flower"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_cylinder(root, Vector3(0.0, 0.2, 0.0), Vector3(0.05, 0.4, 0.05), Color(0.2, 0.5, 0.2), "Stem")
+	_add_sphere(root, Vector3(0.0, 0.45, 0.0), Vector3(0.3, 0.25, 0.3), prop.color, "Bloom")
+
+
+static func _build_path_tile(parent: Node3D, prop: PropData) -> void:
+	_add_plane(parent, prop.position + Vector3(0.0, 0.02, 0.0), prop.scale, prop.color, "PathTile")
+
+
+static func _build_fountain(parent: Node3D, prop: PropData) -> void:
+	var r := prop.scale.x
+	var root := StaticBody3D.new()
+	root.name = "Fountain"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_cylinder(root, Vector3(0.0, 0.3, 0.0), Vector3(r, 0.6, r), prop.color, "Basin")
+	_add_cylinder(root, Vector3(0.0, 0.8, 0.0), Vector3(r * 0.3, 0.6, r * 0.3), prop.color.darkened(0.25), "Pedestal")
+	# M4: gently bobbing water disc.
+	var anim := AmbientAnimator.new()
+	anim.name = "WaterAnim"
+	anim.bob_amplitude = 0.05
+	anim.bob_speed = 2.2
+	root.add_child(anim)
+	_add_sphere(anim, Vector3(0.0, 0.62, 0.0), Vector3(r * 0.85, 0.1, r * 0.85), Color(0.35, 0.65, 0.95), "Water")
+
+
+static func _build_trash_can(parent: Node3D, prop: PropData) -> void:
+	var h := prop.scale.y
+	var root := StaticBody3D.new()
+	root.name = "TrashCan"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_cylinder(root, Vector3(0.0, h * 0.5, 0.0), Vector3(prop.scale.x, h, prop.scale.x), prop.color, "Can")
+	_add_box(root, Vector3(0.0, h + 0.03, 0.0), Vector3(prop.scale.x * 0.9, 0.06, prop.scale.x * 0.9), prop.color.darkened(0.2), "Lid")
+
+
+static func _build_towel(parent: Node3D, prop: PropData) -> void:
+	_add_plane(parent, prop.position + Vector3(0.0, 0.02, 0.0), prop.scale, prop.color, "Towel")
+
+
+static func _build_cooler(parent: Node3D, prop: PropData) -> void:
+	var root := StaticBody3D.new()
+	root.name = "Cooler"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_box(root, Vector3(0.0, prop.scale.y * 0.5, 0.0), prop.scale, prop.color, "Cooler")
+	_add_box(root, Vector3(0.0, prop.scale.y + 0.02, 0.0), Vector3(prop.scale.x * 0.8, 0.05, prop.scale.z * 0.8), prop.color.lightened(0.2), "Lid")
+
+
+static func _build_beach_ball(parent: Node3D, prop: PropData) -> void:
+	_add_sphere(parent, prop.position + Vector3(0.0, prop.scale.y * 0.5, 0.0), prop.scale, prop.color, "BeachBall")
+
+
+static func _build_pillar(parent: Node3D, prop: PropData) -> void:
+	var root := StaticBody3D.new()
+	root.name = "Pillar"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_cylinder(root, Vector3(0.0, prop.scale.y * 0.5, 0.0), prop.scale, prop.color, "Pillar")
+	_add_box(root, Vector3(0.0, prop.scale.y, 0.0), Vector3(prop.scale.x * 1.4, 0.15, prop.scale.x * 1.4), prop.color.darkened(0.15), "Capital")
+
+
+static func _build_booth(parent: Node3D, prop: PropData) -> void:
+	var w := prop.scale.x
+	var h := prop.scale.y
+	var d := prop.scale.z
+	var root := StaticBody3D.new()
+	root.name = "Booth"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_box(root, Vector3(0.0, h - 0.05, 0.0), Vector3(w, 0.1, d), prop.color, "Table")
+	for z in [-d * 0.5 + 0.1, d * 0.5 - 0.1]:
+		_add_box(root, Vector3(0.0, h * 0.4, z), Vector3(0.08, h * 0.8, 0.08), prop.color, "Leg")
+	for x in [-w * 0.5 - 0.35, w * 0.5 + 0.35]:
+		_add_box(root, Vector3(x, h * 0.45, 0.0), Vector3(0.5, 0.08, d), prop.color.lightened(0.15), "Seat")
+		_add_box(root, Vector3(x, h * 0.2, 0.0), Vector3(0.08, h * 0.4, d), prop.color.lightened(0.15), "SeatLeg")
+
+
+static func _build_bar(parent: Node3D, prop: PropData) -> void:
+	var root := StaticBody3D.new()
+	root.name = "Bar"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_box(root, Vector3(0.0, prop.scale.y * 0.5, 0.0), prop.scale, prop.color, "Counter")
+	_add_box(root, Vector3(0.0, prop.scale.y + 0.1, 0.0), Vector3(prop.scale.x, 0.2, prop.scale.z * 0.6), prop.color.lightened(0.2), "Top")
+
+
+static func _build_picnic_table(parent: Node3D, prop: PropData) -> void:
+	var w := prop.scale.x
+	var h := prop.scale.y
+	var d := prop.scale.z
+	var root := StaticBody3D.new()
+	root.name = "PicnicTable"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_box(root, Vector3(0.0, h - 0.05, 0.0), Vector3(w, 0.1, d), prop.color, "Top")
+	for x in [-w * 0.5 + 0.15, w * 0.5 - 0.15]:
+		for z in [-d * 0.5 + 0.15, d * 0.5 - 0.15]:
+			_add_box(root, Vector3(x, h * 0.4, z), Vector3(0.1, h * 0.8, 0.1), prop.color, "Leg")
+	for x in [-w * 0.5 - 0.4, w * 0.5 + 0.4]:
+		_add_box(root, Vector3(x, h * 0.4, 0.0), Vector3(0.35, 0.08, d), prop.color.lightened(0.15), "Bench")
+		_add_box(root, Vector3(x, h * 0.2, 0.0), Vector3(0.08, h * 0.4, d), prop.color.lightened(0.15), "BenchLeg")
+
+
+static func _build_dune(parent: Node3D, prop: PropData) -> void:
+	var root := StaticBody3D.new()
+	root.name = "Dune"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_sphere(root, Vector3(0.0, prop.scale.y * 0.5, 0.0), prop.scale, prop.color, "Dune")
+
+
+static func _build_flag(parent: Node3D, prop: PropData) -> void:
+	var h := prop.scale.y
+	var root := StaticBody3D.new()
+	root.name = "Flag"
+	root.position = prop.position
+	parent.add_child(root)
+	_add_cylinder(root, Vector3(0.0, h * 0.5, 0.0), Vector3(0.08, h, 0.08), Color(0.7, 0.7, 0.7), "Pole")
+	_add_box(root, Vector3(0.0, h * 0.85, 0.0), Vector3(prop.scale.x, h * 0.3, 0.05), prop.color, "Flag")
 
 
 # --- Primitive helpers (mesh + matching solid collider) ----------------------
