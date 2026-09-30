@@ -12,7 +12,7 @@ static func create() -> LevelDefinition:
 	def.sun_color = Color(1.0, 1.0, 0.9)
 	def.sun_intensity = 1.2
 	def.sun_rotation = Vector3(-60.0, 25.0, 0.0)
-	def.target_count = 2
+	def.target_count = 3
 
 	def.props = [
 		PropData.make(PropData.PropType.BUILDING, Vector3(0, 0, -12), Vector3(8.0, 3.0, 5.0), Color(0.6, 0.45, 0.3), PropData.DoorSide.LEFT, 3),
