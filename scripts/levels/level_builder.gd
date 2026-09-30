@@ -8,6 +8,7 @@ const WALL_THICKNESS := 0.2
 const DOOR_WIDTH := 1.2
 const DOOR_HEIGHT := 2.0
 const WINDOW_SIZE := Vector3(0.8, 0.8, 0.05)
+const VIGNETTE_SHADER := preload("res://shaders/vignette.gdshader")
 
 
 static func build(def: LevelDefinition) -> Node3D:
@@ -16,6 +17,7 @@ static func build(def: LevelDefinition) -> Node3D:
 	_build_ground(level, def)
 	_build_sun(level, def)
 	_build_ambient(level, def)
+	_build_vignette(level, def)
 	for prop in def.props:
 		_build_prop(level, prop)
 	return level
@@ -54,13 +56,45 @@ static func _build_sun(parent: Node3D, def: LevelDefinition) -> void:
 
 static func _build_ambient(parent: Node3D, def: LevelDefinition) -> void:
 	var env := Environment.new()
+	# M3a: per-level mood — solid background color, color ambient, bloom glow,
+	# filmic tonemap, and optional subtle fog (vignette is a separate overlay).
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = def.background_color
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = def.ambient_color
 	env.ambient_light_energy = 1.0
+	env.glow_enabled = true
+	env.glow_intensity = def.glow_intensity
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	if def.fog_enabled:
+		env.fog_enabled = true
+		env.fog_light_color = def.fog_color
+		env.fog_density = def.fog_density
 	var we := WorldEnvironment.new()
 	we.name = "WorldEnvironment"
 	we.environment = env
 	parent.add_child(we)
+
+
+## M3a: vignette post-process. Godot 4.7 removed Environment.vignette_* (a
+## Godot 3 API), so the vignette is a fullscreen screen-space overlay: a
+## CanvasLayer (layer 0, below the HUD) with a ColorRect running the vignette
+## shader. Per-level intensity comes from def.vignette_intensity.
+static func _build_vignette(parent: Node3D, def: LevelDefinition) -> void:
+	var layer := CanvasLayer.new()
+	layer.name = "Vignette"
+	layer.layer = 0
+	var rect := ColorRect.new()
+	rect.name = "ColorRect"  # explicit name (Godot 4.7 auto-renames new nodes)
+	rect.anchor_right = 1.0
+	rect.anchor_bottom = 1.0
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat := ShaderMaterial.new()
+	mat.shader = VIGNETTE_SHADER
+	mat.set_shader_parameter("intensity", def.vignette_intensity)
+	rect.material = mat
+	layer.add_child(rect)
+	parent.add_child(layer)
 
 
 # --- Prop dispatch -----------------------------------------------------------

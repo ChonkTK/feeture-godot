@@ -12,6 +12,9 @@ static func create() -> LevelDefinition:
 	def.sun_color = Color(1.0, 0.95, 0.8)
 	def.sun_intensity = 1.4
 	def.sun_rotation = Vector3(-55.0, 35.0, 0.0)
+	def.background_color = Color(0.55, 0.75, 0.95)
+	def.glow_intensity = 0.5
+	def.vignette_intensity = 0.2
 	def.target_count = 2
 
 	def.props = [

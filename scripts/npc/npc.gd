@@ -30,6 +30,7 @@ const ALERT_CALL_RADIUS := 12.0
 const ALERT_CALL_BOOST := 15.0
 const CONE_LENGTH := 14.0
 const CONE_HALF_ANGLE_DEG := 35.0
+const TOON_SHADER := preload("res://shaders/toon.gdshader")
 
 const NAMES: Array[String] = [
 	"Bubbles", "Sunny", "Mango", "Pepper", "Waffles", "Noodle", "Pickle",
@@ -453,15 +454,15 @@ func _build_foot(x: float, shoe: Color, node_name: String) -> void:
 	add_child(foot)
 	var sole := shoe.darkened(0.35)
 	var accent := shoe.lightened(0.35)
-	_add_cylinder(foot, Vector3(0.0, 0.07, 0.0), 0.045, 0.1, shoe, "Ankle")
-	_add_box(foot, Vector3(0.0, 0.045, 0.05), Vector3(0.11, 0.07, 0.22), shoe, "FootBox")
+	_add_cylinder(foot, Vector3(0.0, 0.07, 0.0), 0.045, 0.1, shoe, "Ankle", 0.5)
+	_add_box(foot, Vector3(0.0, 0.045, 0.05), Vector3(0.11, 0.07, 0.22), shoe, "FootBox", 0.5)
 	for i in 5:
 		var tx := lerpf(-0.04, 0.04, float(i) / 4.0)
-		_add_sphere(foot, Vector3(tx, 0.05, 0.16), 0.018, shoe, "Toe%d" % (i + 1))
-	_add_sphere(foot, Vector3(0.0, 0.04, -0.06), 0.035, shoe, "Heel")
-	_add_box(foot, Vector3(0.0, 0.012, 0.05), Vector3(0.12, 0.02, 0.24), sole, "Sole")
-	_add_box(foot, Vector3(0.0, 0.082, 0.05), Vector3(0.11, 0.02, 0.06), accent, "Stripe")
-	_add_box(foot, Vector3(0.0, 0.09, 0.1), Vector3(0.05, 0.03, 0.06), accent, "Tongue")
+		_add_sphere(foot, Vector3(tx, 0.05, 0.16), 0.018, shoe, "Toe%d" % (i + 1), 0.5)
+	_add_sphere(foot, Vector3(0.0, 0.04, -0.06), 0.035, shoe, "Heel", 0.5)
+	_add_box(foot, Vector3(0.0, 0.012, 0.05), Vector3(0.12, 0.02, 0.24), sole, "Sole", 0.5)
+	_add_box(foot, Vector3(0.0, 0.082, 0.05), Vector3(0.11, 0.02, 0.06), accent, "Stripe", 0.5)
+	_add_box(foot, Vector3(0.0, 0.09, 0.1), Vector3(0.05, 0.03, 0.06), accent, "Tongue", 0.5)
 	var area := Area3D.new()
 	area.name = "FootArea"
 	area.add_to_group("feet")
@@ -474,31 +475,33 @@ func _build_foot(x: float, shoe: Color, node_name: String) -> void:
 	foot.add_child(area)
 
 
-# --- Mesh helpers (flat-color StandardMaterial3D) ----------------------------
+# --- Mesh helpers (toon ShaderMaterial; glossy > 0 for feet) -----------------
 
-func _add_mesh(parent: Node3D, mesh: PrimitiveMesh, pos: Vector3, color: Color, node_name: String) -> MeshInstance3D:
+func _add_mesh(parent: Node3D, mesh: PrimitiveMesh, pos: Vector3, color: Color, node_name: String, glossy := 0.0) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.name = node_name
 	mi.mesh = mesh
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
+	var mat := ShaderMaterial.new()
+	mat.shader = TOON_SHADER
+	mat.set_shader_parameter("albedo_color", color)
+	mat.set_shader_parameter("glossy", glossy)
 	mi.material_override = mat
 	mi.position = pos
 	parent.add_child(mi)
 	return mi
 
 
-func _add_box(parent: Node3D, pos: Vector3, size: Vector3, color: Color, node_name: String) -> MeshInstance3D:
+func _add_box(parent: Node3D, pos: Vector3, size: Vector3, color: Color, node_name: String, glossy := 0.0) -> MeshInstance3D:
 	var m := BoxMesh.new()
 	m.size = size
-	return _add_mesh(parent, m, pos, color, node_name)
+	return _add_mesh(parent, m, pos, color, node_name, glossy)
 
 
-func _add_sphere(parent: Node3D, pos: Vector3, radius: float, color: Color, node_name: String) -> MeshInstance3D:
+func _add_sphere(parent: Node3D, pos: Vector3, radius: float, color: Color, node_name: String, glossy := 0.0) -> MeshInstance3D:
 	var m := SphereMesh.new()
 	m.radius = radius
 	m.height = radius * 2.0
-	return _add_mesh(parent, m, pos, color, node_name)
+	return _add_mesh(parent, m, pos, color, node_name, glossy)
 
 
 func _add_capsule(parent: Node3D, pos: Vector3, radius: float, height: float, color: Color, node_name: String) -> MeshInstance3D:
@@ -508,9 +511,9 @@ func _add_capsule(parent: Node3D, pos: Vector3, radius: float, height: float, co
 	return _add_mesh(parent, m, pos, color, node_name)
 
 
-func _add_cylinder(parent: Node3D, pos: Vector3, radius: float, height: float, color: Color, node_name: String) -> MeshInstance3D:
+func _add_cylinder(parent: Node3D, pos: Vector3, radius: float, height: float, color: Color, node_name: String, glossy := 0.0) -> MeshInstance3D:
 	var m := CylinderMesh.new()
 	m.top_radius = radius
 	m.bottom_radius = radius
 	m.height = height
-	return _add_mesh(parent, m, pos, color, node_name)
+	return _add_mesh(parent, m, pos, color, node_name, glossy)
