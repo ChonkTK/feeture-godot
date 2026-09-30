@@ -2,6 +2,7 @@ class_name LevelBuilder
 extends RefCounted
 ## Procedurally builds a Node3D level from a LevelDefinition (M1b).
 ## All props get solid StaticBody3D colliders that block raycasts.
+## M2a: bushes also get a HidingSpot trigger (player can hide inside).
 
 const WALL_THICKNESS := 0.2
 const DOOR_WIDTH := 1.2
@@ -305,6 +306,22 @@ static func _build_bush(parent: Node3D, prop: PropData) -> void:
 	root.position = prop.position
 	parent.add_child(root)
 	_add_sphere(root, Vector3.ZERO, prop.scale, prop.color, "Bush")
+	_add_hiding_spot(root, prop)
+
+
+## M2a: bushes get a HidingSpot trigger — the player can hide inside it with
+## interact (F). Sized from the bush scale with a margin so the player can
+## stand adjacent to the solid foliage and still be inside the trigger.
+static func _add_hiding_spot(parent: Node3D, prop: PropData) -> void:
+	var spot := HidingSpot.new()
+	spot.name = "HidingSpot"
+	var col := CollisionShape3D.new()
+	var shape := SphereShape3D.new()
+	shape.radius = maxf(prop.scale.x, prop.scale.z) * 0.5 + 0.6
+	col.shape = shape
+	col.position = Vector3(0.0, 0.6, 0.0)
+	spot.add_child(col)
+	parent.add_child(spot)
 
 
 static func _build_umbrella(parent: Node3D, prop: PropData) -> void:

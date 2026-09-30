@@ -2,6 +2,7 @@ extends Node
 ## GameManager autoload (M1c): owns game state, level lifecycle, player and NPCs.
 ## Replaces the M0 placeholder. Builds level 0 (Beach) on boot, spawns the
 ## player and NPCs from the level definition. M2 uses next_level()/restart_level().
+## M2a: handle_caught() and global_creep() (max of NPC creeps).
 
 enum State { BOOT, PLAYING, CAUGHT, COMPLETE }
 
@@ -89,6 +90,24 @@ func next_level() -> void:
 func restart_level() -> void:
 	_load_level(level_index)
 	state = State.PLAYING
+
+
+## M2a: the player got caught (creep 100 while visible, or ALERTED within 3m).
+## Prints for now; a HUD hook comes in a later milestone.
+func handle_caught() -> void:
+	if state == State.CAUGHT:
+		return
+	state = State.CAUGHT
+	print("CAUGHT: the player was caught!")
+
+
+## M2a: global creep = max of all NPC creeps (0 when none).
+func global_creep() -> float:
+	var max_creep := 0.0
+	for npc in npcs:
+		if npc != null and npc.creep > max_creep:
+			max_creep = npc.creep
+	return max_creep
 
 
 func _smoke_test() -> void:

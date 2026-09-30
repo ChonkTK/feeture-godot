@@ -12,6 +12,7 @@ run/main_scene="res://scenes/main.tscn"
 [autoload]
 
 GameManager="*res://scripts/autoload/game_manager.gd"
+NoiseSystem="*res://scripts/stealth/noise_system.gd"
 Settings="*res://scripts/autoload/settings.gd"
 
 [display]
