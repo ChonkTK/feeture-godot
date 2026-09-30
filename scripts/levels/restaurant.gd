@@ -15,6 +15,7 @@ static func create() -> LevelDefinition:
 	def.background_color = Color(0.12, 0.08, 0.06)
 	def.glow_intensity = 0.45
 	def.vignette_intensity = 0.4
+	def.crowd_volume = 0.6
 	def.fog_enabled = true
 	def.fog_color = Color(0.4, 0.25, 0.15)
 	def.fog_density = 0.015

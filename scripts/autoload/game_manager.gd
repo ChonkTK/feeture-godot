@@ -55,6 +55,12 @@ func _load_level(index: int) -> void:
 	_spawn_player()
 	_spawn_npcs()
 	_pick_targets()
+	# M3b: per-level crowd ambience volume. AudioManager may not exist yet on
+	# the very first load (autoload order); it picks up current_level in its
+	# own _ready, and this call covers next_level()/restart_level().
+	var am := get_node_or_null("/root/AudioManager")
+	if am != null and am.has_method("set_crowd_volume"):
+		am.set_crowd_volume(current_level.crowd_volume)
 
 
 func _create_level(index: int) -> LevelDefinition:

@@ -31,6 +31,9 @@ const NOISE_INTERVAL := 0.4
 const CROUCH_NOISE_RADIUS := 1.5
 const WALK_NOISE_RADIUS := 4.0
 const SPRINT_NOISE_RADIUS := 11.0
+const FOOTSTEP_WALK_INTERVAL := 0.5
+const FOOTSTEP_SPRINT_INTERVAL := 0.25
+const FOOTSTEP_CROUCH_INTERVAL := 0.6
 
 const SMOOTHING := 10.0
 
@@ -51,6 +54,7 @@ var _pitch := 0.0
 var _crouch_factor := 0.0  # 0.0 standing .. 1.0 crouched
 var _lean := 0.0           # -1.0 .. 1.0 smoothed lean target
 var _noise_timer := 0.0
+var _footstep_timer := 0.0
 
 
 func _ready() -> void:
@@ -121,6 +125,7 @@ func _physics_process(delta: float) -> void:
 
 	# --- Movement noise (silent while hidden) ---
 	_emit_movement_noise(delta)
+	_emit_footsteps(delta)
 
 
 ## Camera-center raycast to the "feet" group (M2a). True when the player is
@@ -166,6 +171,22 @@ func _emit_movement_noise(delta: float) -> void:
 	var radius := CROUCH_NOISE_RADIUS if is_crouching else (SPRINT_NOISE_RADIUS if is_sprinting else WALK_NOISE_RADIUS)
 	NoiseSystem.emit_noise(global_position, radius, radius * 0.5)
 
+
+## M3b: procedural footsteps — rate scales with speed (0.5s walk, 0.25s
+## sprint, 0.6s crouch), silent while hidden or airborne; the AudioManager
+## scales pitch/volume from the speed argument (crouch-walk quieter).
+func _emit_footsteps(delta: float) -> void:
+	if is_hidden or not is_moving or not is_on_floor():
+		_footstep_timer = 0.0
+		return
+	var interval := FOOTSTEP_CROUCH_INTERVAL if is_crouching else (FOOTSTEP_SPRINT_INTERVAL if is_sprinting else FOOTSTEP_WALK_INTERVAL)
+	_footstep_timer -= delta
+	if _footstep_timer > 0.0:
+		return
+	_footstep_timer = interval
+	var am := get_node_or_null("/root/AudioManager")
+	if am != null and am.has_method("play_footstep"):
+		am.play_footstep(current_speed)
 
 ## Photo capture (M2b): delegates to the PhotoCapture child component, which
 ## does the feet raycast, scoring, album record, PNG save, creep spike and

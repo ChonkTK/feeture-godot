@@ -15,6 +15,7 @@ GameManager="*res://scripts/autoload/game_manager.gd"
 PhotoAlbum="*res://scripts/photo/photo_album.gd"
 NoiseSystem="*res://scripts/stealth/noise_system.gd"
 Settings="*res://scripts/autoload/settings.gd"
+AudioManager="*res://scripts/audio/audio_manager.gd"
 
 [display]
 

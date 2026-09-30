@@ -16,6 +16,8 @@ var sun_rotation: Vector3 = Vector3(-50.0, 30.0, 0.0)  # degrees
 var background_color: Color = Color(0.4, 0.5, 0.6)
 var glow_intensity: float = 0.4
 var vignette_intensity: float = 0.25
+# M3b: crowd ambience volume (0..1) for this level.
+var crowd_volume: float = 0.6
 var fog_enabled: bool = false
 var fog_color: Color = Color(0.5, 0.5, 0.5)
 var fog_density: float = 0.01

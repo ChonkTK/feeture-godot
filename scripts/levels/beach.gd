@@ -15,6 +15,7 @@ static func create() -> LevelDefinition:
 	def.background_color = Color(0.55, 0.75, 0.95)
 	def.glow_intensity = 0.5
 	def.vignette_intensity = 0.2
+	def.crowd_volume = 0.7
 	def.target_count = 2
 
 	def.props = [
