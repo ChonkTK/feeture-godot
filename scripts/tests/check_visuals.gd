@@ -5,7 +5,9 @@ extends SceneTree
 ##    VisionCone intentionally stays StandardMaterial3D and is skipped);
 ##  - the level root has a WorldEnvironment with glow enabled, filmic
 ##    tonemap, vignette and a BG_COLOR background;
-##  - all 4 level moods build with glow and distinct background colors.
+##  - all 4 level moods build with glow and distinct background colors;
+##  - M3d: lighting is toned down — glow_intensity < 0.2, vignette
+##    intensity < 0.15, fog disabled on every level.
 
 var _checked := false
 var _failures: Array[String] = []
@@ -79,6 +81,10 @@ func _run() -> void:
 				_fail("tonemap_mode %d != FILMIC" % env.tonemap_mode)
 			if env.background_mode != Environment.BG_COLOR:
 				_fail("background_mode %d != BG_COLOR" % env.background_mode)
+			if env.glow_intensity >= 0.2:
+				_fail("glow_intensity %f not toned down (< 0.2)" % env.glow_intensity)
+			if env.fog_enabled:
+				_fail("fog should be disabled")
 	_check_vignette(level, def)
 
 	# Per-level moods: all 4 levels build with glow + distinct backgrounds.
@@ -95,6 +101,10 @@ func _run() -> void:
 				_fail("%s: glow not enabled" % ldef.name)
 			else:
 				seen_bg[lenv.background_color.to_html(false)] = ldef.name
+				if lenv.glow_intensity >= 0.2:
+					_fail("%s: glow_intensity %f not toned down (< 0.2)" % [ldef.name, lenv.glow_intensity])
+				if lenv.fog_enabled:
+					_fail("%s: fog should be disabled" % ldef.name)
 		l.free()
 	if seen_bg.size() < 4:
 		_fail("level background colors not distinct (%d unique)" % seen_bg.size())
@@ -125,6 +135,8 @@ func _check_vignette(level: Node3D, def: LevelDefinition) -> void:
 	var intensity := float((mat as ShaderMaterial).get_shader_parameter("intensity"))
 	if intensity <= 0.0:
 		_fail("Vignette intensity not set (got %f)" % intensity)
+	if intensity >= 0.15:
+		_fail("Vignette intensity %f not toned down (< 0.15)" % intensity)
 	if absf(intensity - def.vignette_intensity) > 0.001:
 		_fail("Vignette intensity %f != def %f" % [intensity, def.vignette_intensity])
 

@@ -13,12 +13,8 @@ static func create() -> LevelDefinition:
 	def.sun_intensity = 0.8
 	def.sun_rotation = Vector3(-40.0, 20.0, 0.0)
 	def.background_color = Color(0.08, 0.1, 0.16)
-	def.glow_intensity = 0.3
-	def.vignette_intensity = 0.35
-	def.crowd_volume = 0.8
-	def.fog_enabled = true
-	def.fog_color = Color(0.3, 0.4, 0.6)
-	def.fog_density = 0.02
+	def.glow_intensity = 0.1
+	def.vignette_intensity = 0.1
 	def.target_count = 2
 
 	def.props = [
