@@ -29,7 +29,7 @@ const ANGLE_FULL_DEG := 60.0  # downward pitch at which the angle bonus maxes
 const FACE_VISIBLE_BONUS := 15
 
 const PHOTO_NOISE_RADIUS := 8.0
-const PHOTO_NOISE_LOUDNESS := 4.0
+const PHOTO_NOISE_LOUDNESS := 5.0  # creep added to nearby NPCs (weird act)
 const CREEP_BUMP := 5.0
 
 const FLASH_DECAY := 3.0

@@ -1,9 +1,11 @@
 extends SceneTree
 ## Stealth smoke test (M2a): builds a level, spawns player + 1 NPC, and asserts
-## the creep rule — creep rises ONLY when the NPC sees the player AND the player
-## is zoomed in on feet. Also checks hiding breaks line of sight and noise
-## raises creep. Deferred to _process so autoloads (GameManager, NoiseSystem)
-## are registered; the --script itself cannot reference autoload identifiers.
+## the suspicion rule — NPCs only become SUSPICIOUS when they WITNESS weird
+## behavior: zooming in on feet while visible, or a photo capture (noise with
+## creep). Just being seen (or being close) does nothing. Movement noise makes
+## the NPC investigate the sound position but adds no creep. Deferred to
+## _process so autoloads (GameManager, NoiseSystem) are registered; the
+## --script itself cannot reference autoload identifiers.
 
 const PLAYER_SCENE := "res://scenes/player/player.tscn"
 const NPC_SCENE := "res://scenes/npc/npc.tscn"
@@ -45,44 +47,63 @@ func _run() -> void:
 	# Freeze the player's per-frame controller so test-set state persists.
 	player.set_physics_process(false)
 
-	# --- (a) seen normally: creep must NOT rise, but the NPC stares ---
+	# Park the NPC: stand still facing the player (yaw 0 faces -Z) so line of
+	# sight stays true for the whole test regardless of wander randomness.
+	npc._ai_state = NPC.AiState.IDLE
+	npc._idle_time = 100.0
+	npc._look_timer = 100.0
+	npc._yaw = 0.0
+	npc.rotation.y = 0.0
+
+	# --- (a) seen normally: NPC stays IDLE, creep stays 0 ---
 	player.is_zoomed = false
 	player.is_aiming_at_feet = false
 	await _wait_seconds(0.5)
 	if npc.creep > 0.5:
 		_fail("creep rose while just being seen (creep=%.2f)" % npc.creep)
-	if npc.state != NPC.State.SUSPICIOUS:
-		_fail("NPC did not become SUSPICIOUS when seeing the player (state=%d)" % npc.state)
+	if npc.state != NPC.State.IDLE:
+		_fail("NPC left IDLE while just being seen (state=%d)" % npc.state)
 
-	# --- (b) zoomed + aiming at feet while visible: creep MUST rise ---
+	# --- (b) zoomed + aiming at feet while visible: SUSPICIOUS + creep rises ---
 	player.is_zoomed = true
 	player.is_aiming_at_feet = true
+	await _wait_seconds(0.1)
+	if npc.state != NPC.State.SUSPICIOUS:
+		_fail("NPC did not become SUSPICIOUS when zooming on feet (state=%d)" % npc.state)
 	var before := npc.creep
 	await _wait_seconds(0.5)
 	var gained := npc.creep - before
 	if gained < 2.0:
 		_fail("creep did not rise while zoomed on feet (gained=%.2f)" % gained)
 
-	# --- (c) hidden: the NPC must stop seeing the player (no gain, then decay) ---
+	# --- (c) hidden: the NPC must stop seeing the player (no gain) ---
 	player.is_hidden = true
 	var before_hidden := npc.creep
 	await _wait_seconds(0.5)
 	if npc.creep > before_hidden + 0.5:
 		_fail("creep kept rising while hidden (creep=%.2f)" % npc.creep)
-	await _wait_seconds(2.5)
-	if npc.creep >= before_hidden:
-		_fail("creep did not decay while hidden (creep=%.2f)" % npc.creep)
 
-	# --- (d) noise near the NPC raises its creep ---
-	player.is_hidden = false
-	player.is_zoomed = false
-	player.is_aiming_at_feet = false
-	var before_noise := npc.creep
+	# --- (d) movement noise: investigates the position but creep stays 0 ---
+	# Player stays hidden so the NPC's per-frame last_seen_pos update (visible
+	# player) cannot overwrite the noise position we assert on.
+	npc.creep = 0.0
+	npc.state = NPC.State.IDLE
 	var noise_system := root.get_node("NoiseSystem")
-	noise_system.emit_noise(npc.global_position, 6.0, 10.0)
+	var noise_pos := npc.global_position + Vector3(2.0, 0.0, 0.0)
+	noise_system.emit_noise(noise_pos, 6.0, 0.0)
 	await _wait_seconds(0.1)
-	if npc.creep <= before_noise:
-		_fail("noise did not raise creep (creep=%.2f)" % npc.creep)
+	if npc.creep > 0.5:
+		_fail("movement noise raised creep (creep=%.2f)" % npc.creep)
+	if npc.last_seen_pos.distance_to(noise_pos) > 0.5:
+		_fail("NPC did not investigate the movement noise position (last_seen=%.2f,%.2f,%.2f)" % [npc.last_seen_pos.x, npc.last_seen_pos.y, npc.last_seen_pos.z])
+
+	# --- (e) capture noise: creep rises (weird act) ---
+	player.is_hidden = false
+	var before_capture := npc.creep
+	noise_system.emit_noise(npc.global_position, 6.0, 5.0)
+	await _wait_seconds(0.1)
+	if npc.creep <= before_capture:
+		_fail("capture noise did not raise creep (creep=%.2f)" % npc.creep)
 
 	_finish()
 

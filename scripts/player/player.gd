@@ -159,7 +159,8 @@ func _raycast_feet() -> bool:
 
 
 ## Periodic movement noise: crouch ~1.5, walk ~4, sprint ~11 radius, every
-## ~0.4s while moving. Silent while hidden or standing still.
+## ~0.4s while moving. Silent while hidden or standing still. Movement noise
+## adds 0 creep (walking isn't weird) — NPCs only investigate the position.
 func _emit_movement_noise(delta: float) -> void:
 	if is_hidden or not is_moving:
 		_noise_timer = 0.0
@@ -169,7 +170,9 @@ func _emit_movement_noise(delta: float) -> void:
 		return
 	_noise_timer = NOISE_INTERVAL
 	var radius := CROUCH_NOISE_RADIUS if is_crouching else (SPRINT_NOISE_RADIUS if is_sprinting else WALK_NOISE_RADIUS)
-	NoiseSystem.emit_noise(global_position, radius, radius * 0.5)
+	# Movement noise carries 0 creep — walking isn't weird; NPCs only
+	# investigate the sound position.
+	NoiseSystem.emit_noise(global_position, radius, 0.0)
 
 
 ## M3b: procedural footsteps — rate scales with speed (0.5s walk, 0.25s

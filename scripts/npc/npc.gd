@@ -4,9 +4,10 @@ extends CharacterBody3D
 ## {IDLE, SUSPICIOUS, ALERTED, SEARCHING}, line-of-sight from the eyes, a
 ## translucent vision cone, noise hearing, alert call-outs and caught detection.
 ##
-## Creep rule: creep rises ONLY when the NPC can see the player AND the player
-## is zoomed in on feet (is_zoomed && is_aiming_at_feet), or when the player
-## takes a photo (noise). Just being seen does NOT raise creep.
+## Creep rule: creep rises ONLY when the NPC WITNESSES the player doing
+## something weird — zooming in on feet (is_zoomed && is_aiming_at_feet) or
+## taking a photo (capture noise). Just being seen (or being close) does NOT
+## raise creep or change state; the NPC keeps wandering.
 
 const WALK_SPEED := 1.5
 const ALERT_SPEED := 2.4
@@ -20,7 +21,6 @@ const FOV_HALF_ANGLE_DEG := 70.0
 const CREEP_GAIN_RATE := 13.0
 const CREEP_ALERT_THRESHOLD := 50.0
 const CREEP_CAUGHT_THRESHOLD := 100.0
-const CLOSE_RANGE := 2.5
 const CAUGHT_RANGE := 3.0
 const LOST_SIGHT_TIME := 2.0
 const SEARCH_TIME := 4.0
@@ -127,12 +127,14 @@ func add_creep(amount: float) -> void:
 	creep = minf(creep + amount, CREEP_CAUGHT_THRESHOLD)
 
 
-## M2a: noise/alert hook — adds creep and points the NPC at the source.
+## M2a: noise/alert hook — amount is the creep added (0 for movement noise,
+## >0 for weird acts like photo capture). The NPC investigates the position
+## regardless (updates last_seen_pos); creep only rises for weird acts.
 func hear_noise(pos: Vector3, amount: float) -> void:
+	last_seen_pos = pos
 	if amount <= 0.0:
 		return
 	add_creep(amount)
-	last_seen_pos = pos
 	if state == State.IDLE:
 		state = State.SUSPICIOUS
 	elif state == State.SEARCHING:
@@ -179,11 +181,13 @@ func _update_state(delta: float, p: Node3D) -> void:
 	if _visible:
 		last_seen_pos = p.global_position
 		_lost_sight_time = 0.0
-		# Creep rises ONLY while the player is zoomed in on feet.
+		# SUSPICIOUS is entered ONLY when the player does something weird:
+		# zooming in on feet. Just being seen keeps the NPC IDLE/wandering.
 		if p.is_zoomed and p.is_aiming_at_feet:
+			if state == State.IDLE or state == State.SEARCHING:
+				state = State.SUSPICIOUS
+			# Creep rises at the existing rate while the weird behavior continues.
 			creep = minf(creep + CREEP_GAIN_RATE * delta, CREEP_CAUGHT_THRESHOLD)
-		if state == State.IDLE or state == State.SEARCHING:
-			state = State.SUSPICIOUS
 		# Caught: creep at 100 while visible.
 		if creep >= CREEP_CAUGHT_THRESHOLD:
 			_caught()
@@ -194,11 +198,6 @@ func _update_state(delta: float, p: Node3D) -> void:
 	var dist := INF
 	if p != null:
 		dist = global_position.distance_to(p.global_position)
-
-	# Very close: alert immediately (from any non-alerted state).
-	if state != State.ALERTED and dist < CLOSE_RANGE:
-		_enter_alerted()
-		return
 
 	# Caught: ALERTED and within caught range.
 	if state == State.ALERTED and dist < CAUGHT_RANGE:
