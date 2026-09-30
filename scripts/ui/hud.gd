@@ -1,31 +1,35 @@
 class_name HUD
 extends CanvasLayer
 ## M2c HUD: built entirely in code (no .tscn). Top-left level name + photo
-## count + total score; top-right TARGETS checklist ("[x] Name / [ ] Name");
-## bottom global creep bar (green -> red); center messages ("Captured: ...",
-## "HIDDEN", "CAUGHT — restarting...", "LEVEL COMPLETE"); Esc pause overlay
-## (resume/quit). Wired to GameManager signals (photo_captured, state_changed,
-## target_photographed) and the player's is_hidden state.
+## count + total score; top-right TARGETS checklist (styled, [x] green /
+## [ ] grey); bottom global creep bar (green -> red) with a CREEP label;
+## center message queue (up to 3 stacked messages); bottom-left controller
+## hint. M3c: the pause overlay moved to PauseMenu and the album browser to
+## AlbumUI — the HUD is the single input owner for the pause/album actions
+## (routes them, so there is no double-pause). Wired to GameManager signals
+## (photo_captured, state_changed, target_photographed) and the player's
+## is_hidden state.
 ##
 ## Autoloads are looked up at runtime with get_node() because this script is
 ## compiled during autoload init (GameManager builds it in _ready), where
-## autoload identifiers are not resolvable. The state enum is re-declared here
-## (values match GameManager.State).
+## autoload identifiers are not resolvable. The state enum is re-declared
+## here (values match GameManager.State).
 
 enum State { BOOT, PLAYING, CAUGHT, COMPLETE }
 
 const MESSAGE_DURATION := 2.0
+const MAX_MESSAGES := 3
 
 var _level_label: Label
 var _score_label: Label
-var _targets_label: Label
+var _targets_label: RichTextLabel
 var _creep_fill: ColorRect
 var _message_label: Label
 var _hidden_label: Label
-var _pause_overlay: Control
-var _paused := false
-var _message_timer := 0.0
-var _persistent_message := ""
+var _hint_label: Label
+var _pause_menu: PauseMenu
+var _album_ui: AlbumUI
+var _messages: Array[Dictionary] = []  # {text, time}; time -1 = persistent
 
 
 func _ready() -> void:
@@ -51,28 +55,27 @@ func _process(delta: float) -> void:
 	_creep_fill.size.x = 300.0 * t
 	# Hidden indicator (player state).
 	_hidden_label.visible = gm.player != null and gm.player.is_hidden
-	# Transient message timer.
-	if _message_timer > 0.0:
-		_message_timer -= delta
-		if _message_timer <= 0.0 and _persistent_message.is_empty():
-			_message_label.text = ""
+	# Message queue expiry.
+	_tick_messages(delta)
 	# Keep the photo count / total score fresh (album is the source of truth).
 	_refresh_score()
 
 
+## Single input owner for pause/album: Esc toggles the pause menu (or closes
+## the album / settings first), Tab toggles the album (ignored while paused).
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
-		_toggle_pause()
-
-
-func _toggle_pause() -> void:
-	_paused = not _paused
-	get_tree().paused = _paused
-	_pause_overlay.visible = _paused
-	if _paused:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	else:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if _album_ui.is_open():
+			_album_ui.close()
+		elif _pause_menu.is_open() and _pause_menu.is_settings_open():
+			_pause_menu.close_settings()
+		else:
+			_pause_menu.toggle()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("album"):
+		if not _pause_menu.is_open():
+			_album_ui.toggle()
+		get_viewport().set_input_as_handled()
 
 
 func _on_photo_captured(npc_name: String, score: int, rank: String) -> void:
@@ -87,9 +90,8 @@ func _on_target_photographed(_npc_name: String) -> void:
 func _on_state_changed(new_state: int) -> void:
 	match new_state:
 		State.PLAYING:
-			_persistent_message = ""
-			_message_label.text = ""
-			_message_timer = 0.0
+			_messages.clear()
+			_render_messages()
 			_refresh_level()
 			_refresh_targets()
 		State.CAUGHT:
@@ -99,9 +101,30 @@ func _on_state_changed(new_state: int) -> void:
 
 
 func _show_message(text: String, duration: float) -> void:
-	_message_label.text = text
-	_message_timer = duration
-	_persistent_message = "" if duration > 0.0 else text
+	_messages.append({"text": text, "time": duration if duration > 0.0 else -1.0})
+	if _messages.size() > MAX_MESSAGES:
+		_messages.pop_front()
+	_render_messages()
+
+
+func _render_messages() -> void:
+	var lines: Array[String] = []
+	for m in _messages:
+		lines.append(m["text"])
+	_message_label.text = "\n".join(lines)
+
+
+func _tick_messages(delta: float) -> void:
+	var changed := false
+	for i in range(_messages.size() - 1, -1, -1):
+		var m: Dictionary = _messages[i]
+		if m["time"] > 0.0:
+			m["time"] = m["time"] - delta
+			if m["time"] <= 0.0:
+				_messages.remove_at(i)
+				changed = true
+	if changed:
+		_render_messages()
 
 
 func _refresh_level() -> void:
@@ -125,7 +148,10 @@ func _refresh_targets() -> void:
 	var lines: Array[String] = []
 	for t in gm.targets:
 		var done: bool = t.npc_name in gm.targets_photographed
-		lines.append(("[x] " if done else "[ ] ") + t.npc_name)
+		if done:
+			lines.append("[color=#7CFC00][x] %s[/color]" % t.npc_name)
+		else:
+			lines.append("[color=#E0E0E0][ ] %s[/color]" % t.npc_name)
 	_targets_label.text = "TARGETS\n" + "\n".join(lines)
 
 
@@ -149,13 +175,15 @@ func _build_ui() -> void:
 	_score_label.add_theme_font_size_override("font_size", 18)
 	top_left.add_child(_score_label)
 
-	# Top-right: TARGETS checklist.
-	_targets_label = Label.new()
-	_targets_label.add_theme_font_size_override("font_size", 18)
+	# Top-right: TARGETS checklist (RichTextLabel for per-line color).
+	_targets_label = RichTextLabel.new()
+	_targets_label.bbcode_enabled = true
+	_targets_label.fit_content = true
+	_targets_label.scroll_active = false
+	_targets_label.add_theme_font_size_override("normal_font_size", 18)
 	_targets_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	_targets_label.position = Vector2(-240, 12)
 	_targets_label.size = Vector2(220, 200)
-	_targets_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	root_control.add_child(_targets_label)
 
 	# Top-center: HIDDEN indicator.
@@ -169,7 +197,15 @@ func _build_ui() -> void:
 	_hidden_label.visible = false
 	root_control.add_child(_hidden_label)
 
-	# Bottom-center: creep bar (background + green->red fill).
+	# Bottom-center: creep bar (label + background + green->red fill).
+	var creep_label := Label.new()
+	creep_label.text = "CREEP"
+	creep_label.add_theme_font_size_override("font_size", 12)
+	creep_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	creep_label.position = Vector2(-150, -58)
+	creep_label.size = Vector2(300, 16)
+	creep_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root_control.add_child(creep_label)
 	var bar := ColorRect.new()
 	bar.color = Color(0.1, 0.1, 0.1, 0.8)
 	bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -182,60 +218,26 @@ func _build_ui() -> void:
 	_creep_fill.size = Vector2(300, 16)
 	bar.add_child(_creep_fill)
 
-	# Center: message label.
+	# Center: message label (stacked queue).
 	_message_label = Label.new()
-	_message_label.add_theme_font_size_override("font_size", 32)
+	_message_label.add_theme_font_size_override("font_size", 30)
 	_message_label.set_anchors_preset(Control.PRESET_CENTER)
-	_message_label.position = Vector2(-300, -30)
-	_message_label.size = Vector2(600, 60)
+	_message_label.position = Vector2(-300, -50)
+	_message_label.size = Vector2(600, 100)
 	_message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root_control.add_child(_message_label)
 
-	_build_pause_overlay(root_control)
+	# Bottom-left: controller hint.
+	_hint_label = Label.new()
+	_hint_label.text = "WASD move · Shift sprint · Ctrl crouch · LMB capture · Tab album · Esc pause · Gamepad supported"
+	_hint_label.add_theme_font_size_override("font_size", 13)
+	_hint_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_hint_label.position = Vector2(16, -28)
+	_hint_label.size = Vector2(700, 20)
+	root_control.add_child(_hint_label)
 
-
-func _build_pause_overlay(parent: Control) -> void:
-	_pause_overlay = Control.new()
-	_pause_overlay.name = "PauseOverlay"
-	_pause_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_pause_overlay.visible = false
-	parent.add_child(_pause_overlay)
-
-	var dim := ColorRect.new()
-	dim.color = Color(0.0, 0.0, 0.0, 0.6)
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_pause_overlay.add_child(dim)
-
-	var title := Label.new()
-	title.text = "PAUSED"
-	title.add_theme_font_size_override("font_size", 40)
-	title.set_anchors_preset(Control.PRESET_CENTER)
-	title.position = Vector2(-120, -140)
-	title.size = Vector2(240, 50)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_pause_overlay.add_child(title)
-
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.position = Vector2(-80, -60)
-	box.add_theme_constant_override("separation", 12)
-	_pause_overlay.add_child(box)
-	var resume := Button.new()
-	resume.text = "Resume"
-	resume.custom_minimum_size = Vector2(160, 40)
-	resume.pressed.connect(_on_resume_pressed)
-	box.add_child(resume)
-	var quit := Button.new()
-	quit.text = "Quit"
-	quit.custom_minimum_size = Vector2(160, 40)
-	quit.pressed.connect(_on_quit_pressed)
-	box.add_child(quit)
-
-
-func _on_resume_pressed() -> void:
-	_toggle_pause()
-
-
-func _on_quit_pressed() -> void:
-	get_tree().quit()
+	# M3c: pause menu + album browser (delegated; HUD routes their input).
+	_pause_menu = PauseMenu.new()
+	add_child(_pause_menu)
+	_album_ui = AlbumUI.new()
+	add_child(_album_ui)
