@@ -1,8 +1,10 @@
 extends CharacterBody3D
-## First-person player controller (M1a) + stealth hooks (M2a).
+## First-person player controller (M1a) + stealth hooks (M2a) + photo (M2b).
 ## WASD movement relative to camera yaw, mouse look, crouch, lean, zoom, interact.
 ## M2a: is_aiming_at_feet (camera-center raycast to the "feet" group), is_hidden
-## (set by HidingSpot), movement noise via NoiseSystem, photo-capture noise.
+## (set by HidingSpot), movement noise via NoiseSystem.
+## M2b: the capture action delegates to the PhotoCapture child component
+## (scoring, album, PNG, creep spike, flash).
 
 const WALK_SPEED := 4.0
 const SPRINT_SPEED := 6.5
@@ -29,8 +31,6 @@ const NOISE_INTERVAL := 0.4
 const CROUCH_NOISE_RADIUS := 1.5
 const WALK_NOISE_RADIUS := 4.0
 const SPRINT_NOISE_RADIUS := 11.0
-const PHOTO_NOISE_RADIUS := 8.0
-const PHOTO_NOISE_LOUDNESS := 4.0
 
 const SMOOTHING := 10.0
 
@@ -131,9 +131,13 @@ func _raycast_feet() -> bool:
 	var to := from - camera.global_transform.basis.z * AIM_RANGE
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	query.collide_with_areas = true
-	# Skip the player's own body and all NPC bodies so the ray can reach the
-	# feet trigger colliders (an NPC capsule would otherwise occlude the feet).
-	var exclude: Array[RID] = [get_rid()]
+	# Skip every player body (self + any test/other player) and all NPC bodies
+	# so the ray can reach the feet trigger colliders (a capsule would
+	# otherwise occlude the feet).
+	var exclude: Array[RID] = []
+	for p in get_tree().get_nodes_in_group("player"):
+		if p is PhysicsBody3D:
+			exclude.append(p.get_rid())
 	for npc in get_tree().get_nodes_in_group("npcs"):
 		if npc is PhysicsBody3D:
 			exclude.append(npc.get_rid())
@@ -163,10 +167,13 @@ func _emit_movement_noise(delta: float) -> void:
 	NoiseSystem.emit_noise(global_position, radius, radius * 0.5)
 
 
-## Photo capture (M2a hook): emits a small noise (~8 radius) so nearby NPCs
-## notice the shutter. Full capture scoring comes in a later milestone.
+## Photo capture (M2b): delegates to the PhotoCapture child component, which
+## does the feet raycast, scoring, album record, PNG save, creep spike and
+## flash. The M2a noise-only hook moved there.
 func _capture() -> void:
-	NoiseSystem.emit_noise(global_position, PHOTO_NOISE_RADIUS, PHOTO_NOISE_LOUDNESS)
+	var pc := get_node_or_null("PhotoCapture")
+	if pc != null:
+		pc.try_capture()
 
 
 func _interact() -> void:

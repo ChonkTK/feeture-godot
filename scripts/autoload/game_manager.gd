@@ -3,6 +3,7 @@ extends Node
 ## Replaces the M0 placeholder. Builds level 0 (Beach) on boot, spawns the
 ## player and NPCs from the level definition. M2 uses next_level()/restart_level().
 ## M2a: handle_caught() and global_creep() (max of NPC creeps).
+## M2b: prints a line when the player's PhotoCapture component takes a photo.
 
 enum State { BOOT, PLAYING, CAUGHT, COMPLETE }
 
@@ -54,6 +55,10 @@ func _spawn_player() -> void:
 	player = scene.instantiate() as Node3D
 	player.position = Vector3.ZERO
 	level_root.add_child(player)
+	# M2b: hook the player's photo capture so we can print/score it.
+	var pc := player.get_node_or_null("PhotoCapture")
+	if pc != null and pc.has_signal("photo_captured"):
+		pc.photo_captured.connect(_on_photo_captured)
 
 
 func _spawn_npcs() -> void:
@@ -108,6 +113,11 @@ func global_creep() -> float:
 		if npc != null and npc.creep > max_creep:
 			max_creep = npc.creep
 	return max_creep
+
+
+## M2b: a photo was taken — print a line (targets/win come in M2c).
+func _on_photo_captured(npc_name: String, score: int, rank: String) -> void:
+	print("PHOTO: %s — %d pts (%s)" % [npc_name, score, rank])
 
 
 func _smoke_test() -> void:
